@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function find_all(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sort_column(elem) {
+    toggle_sort_states(elem);
+    var colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    var key;
+    if (elem.classList.contains('numeric')) {
+        key = key_num;
+    } else if (elem.classList.contains('result')) {
+        key = key_result;
+    } else {
+        key = key_alpha;
+    }
+    sort_table(elem, key(colIndex));
+}
+
+function show_all_extras() {
+    find_all('.col-result').forEach(show_extras);
+}
+
+function hide_all_extras() {
+    find_all('.col-result').forEach(hide_extras);
+}
+
+function show_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.remove("collapsed");
+    expandcollapse.classList.remove("expander");
+    expandcollapse.classList.add("collapser");
+}
+
+function hide_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.add("collapsed");
+    expandcollapse.classList.remove("collapser");
+    expandcollapse.classList.add("expander");
+}
+
+function show_filters() {
+    var filter_items = document.getElementsByClassName('filter');
+    for (var i = 0; i < filter_items.length; i++)
+        filter_items[i].hidden = false;
+}
+
+function add_collapse() {
+    // Add links for show/hide all
+    var resulttable = find('table#results-table');
+    var showhideall = document.createElement("p");
+    showhideall.innerHTML = '<a href="javascript:show_all_extras()">Show all details</a> / ' +
+                            '<a href="javascript:hide_all_extras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    find_all('.col-result').forEach(function(elem) {
+        var collapsed = get_query_parameter('collapsed') || 'Passed';
+        var extras = elem.parentNode.nextElementSibling;
+        var expandcollapse = document.createElement("span");
+        if (extras.classList.contains("collapsed")) {
+            expandcollapse.classList.add("expander")
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add("collapsed");
+            expandcollapse.classList.add("expander");
+        } else {
+            expandcollapse.classList.add("collapser");
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener("click", function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains("collapsed")) {
+                show_extras(event.currentTarget);
+            } else {
+                hide_extras(event.currentTarget);
+            }
+        });
+    })
+}
+
+function get_query_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () {
+    reset_sort_headers();
+
+    add_collapse();
+
+    show_filters();
+
+    sort_column(find('.initial-sort'));
+
+    find_all('.sortable').forEach(function(elem) {
+        elem.addEventListener("click",
+                              function(event) {
+                                  sort_column(elem);
+                              }, false)
+    });
+
+};
+
+function sort_table(clicked, key_func) {
+    var rows = find_all('.results-table-row');
+    var reversed = !clicked.classList.contains('asc');
+    var sorted_rows = sort(rows, key_func, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    var thead = document.getElementById("results-table-head");
+    document.getElementById('results-table').remove();
+    var parent = document.createElement("table");
+    parent.id = "results-table";
+    parent.appendChild(thead);
+    sorted_rows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName("BODY")[0].appendChild(parent);
+}
+
+function sort(items, key_func, reversed) {
+    var sort_array = items.map(function(item, i) {
+        return [key_func(item), i];
+    });
+
+    sort_array.sort(function(a, b) {
+        var key_a = a[0];
+        var key_b = b[0];
+
+        if (key_a == key_b) return 0;
+
+        if (reversed) {
+            return (key_a < key_b ? 1 : -1);
+        } else {
+            return (key_a > key_b ? 1 : -1);
+        }
+    });
+
+    return sort_array.map(function(item) {
+        var index = item[1];
+        return items[index];
+    });
+}
+
+function key_alpha(col_index) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[col_index].firstChild.data.toLowerCase();
+    };
+}
+
+function key_num(col_index) {
+    return function(elem) {
+        return parseFloat(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function key_result(col_index) {
+    return function(elem) {
+        var strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+                       'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function reset_sort_headers() {
+    find_all('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    find_all('.sortable').forEach(function(elem) {
+        var icon = document.createElement("div");
+        icon.className = "sort-icon";
+        icon.textContent = "vvv";
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove("desc", "active");
+        elem.classList.add("asc", "inactive");
+    });
+}
+
+function toggle_sort_states(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        reset_sort_headers();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function is_all_rows_hidden(value) {
+  return value.hidden == false;
+}
+
+function filter_table(elem) {
+    var outcome_att = "data-test-result";
+    var outcome = elem.getAttribute(outcome_att);
+    class_outcome = outcome + " results-table-row";
+    var outcome_rows = document.getElementsByClassName(class_outcome);
+
+    for(var i = 0; i < outcome_rows.length; i++){
+        outcome_rows[i].hidden = !elem.checked;
+    }
+
+    var rows = find_all('.results-table-row').filter(is_all_rows_hidden);
+    var all_rows_hidden = rows.length == 0 ? true : false;
+    var not_found_message = document.getElementById("not-found-message");
+    not_found_message.hidden = !all_rows_hidden;
+}
+</script>
+    <h1>login.html</h1>
+    <p>Report generated on 03-Nov-2021 at 16:04:34 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v2.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>JAVA_HOME</td>
+        <td>/Library/Java/JavaVirtualMachines/jdk1.8.0_281.jdk/Contents/Home</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "py": "1.10.0", "pytest": "5.4.3"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>macOS-10.15.7-x86_64-i386-64bit</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"html": "2.1.1", "metadata": "1.11.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.8.5</td></tr></table>
+    <h2>Summary</h2>
+    <p>1 tests ran in 0.46 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="passed">1 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable numeric" col="duration">Duration</th>
+          <th>Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">testcases/login_test.py::TestCaseLogin::test_start</td>
+          <td class="col-duration">0.31</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stderr call------------------------------ <br/>[32m2021-11-03 16:04:33.912[0m | [1mINFO    [0m | [36mhttprunner.loader[0m:[36mload_dot_env_file[0m:[36m127[0m - [1mLoading environment variables from /Users/yanglei2_vendor/Desktop/20211031/.env[0m
+[32m2021-11-03 16:04:33.913[0m | [34m[1mDEBUG   [0m | [36mhttprunner.utils[0m:[36mset_os_environ[0m:[36m33[0m - [34m[1mSet OS environment variable: USERNAME[0m
+[32m2021-11-03 16:04:33.914[0m | [34m[1mDEBUG   [0m | [36mhttprunner.utils[0m:[36mset_os_environ[0m:[36m33[0m - [34m[1mSet OS environment variable: PASSWORD[0m
+[32m2021-11-03 16:04:33.922[0m | [1mINFO    [0m | [36mhttprunner.runner[0m:[36mtest_start[0m:[36m450[0m - [1mStart to run testcase: testcase description, TestCase ID: f7273885-745f-4bd8-ac24-ee46611d02e9[0m
+[32m2021-11-03 16:04:33.923[0m | [1mINFO    [0m | [36mhttprunner.runner[0m:[36m__run_step[0m:[36m292[0m - [1mrun step begin: /v1/user/login &gt;&gt;&gt;&gt;&gt;&gt;[0m
+[32m2021-11-03 16:04:34.123[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mrequest[0m:[36m186[0m - [34m[1mclient IP: 10.158.154.40, Port: 56951[0m
+[32m2021-11-03 16:04:34.124[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mrequest[0m:[36m194[0m - [34m[1mserver IP: 10.4.12.64, Port: 30007[0m
+[32m2021-11-03 16:04:34.125[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mlog_print[0m:[36m40[0m - [34m[1m
+================== request details ==================
+method   : POST
+url      : http://10.4.12.64:30007/v1/user/login
+headers  : {
+    &quot;User-Agent&quot;: &quot;Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36&quot;,
+    &quot;Accept-Encoding&quot;: &quot;gzip, deflate&quot;,
+    &quot;Accept&quot;: &quot;application/json, text/plain, */*&quot;,
+    &quot;Connection&quot;: &quot;keep-alive&quot;,
+    &quot;Host&quot;: &quot;10.4.12.64:30007&quot;,
+    &quot;Content-Length&quot;: &quot;47&quot;,
+    &quot;Pragma&quot;: &quot;no-cache&quot;,
+    &quot;Cache-Control&quot;: &quot;no-cache&quot;,
+    &quot;language&quot;: &quot;en&quot;,
+    &quot;Content-Type&quot;: &quot;application/json;charset=UTF-8&quot;,
+    &quot;Expires&quot;: &quot;-1&quot;,
+    &quot;Origin&quot;: &quot;http://10.4.12.64:30007&quot;,
+    &quot;Referer&quot;: &quot;http://10.4.12.64:30007/login&quot;,
+    &quot;Accept-Language&quot;: &quot;zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7&quot;,
+    &quot;HRUN-Request-ID&quot;: &quot;HRUN-f7273885-745f-4bd8-ac24-ee46611d02e9-673924&quot;
+}
+cookies  : {}
+body     : {
+    &quot;user&quot;: &quot;admin2021&quot;,
+    &quot;password&quot;: &quot;Admin@2021&quot;
+}
+[0m
+[32m2021-11-03 16:04:34.126[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mlog_print[0m:[36m40[0m - [34m[1m
+================== response details ==================
+status_code : 200
+headers  : {
+    &quot;Server&quot;: &quot;nginx/1.17.10&quot;,
+    &quot;Date&quot;: &quot;Wed, 03 Nov 2021 08:02:33 GMT&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;,
+    &quot;Content-Length&quot;: &quot;237&quot;,
+    &quot;Connection&quot;: &quot;keep-alive&quot;,
+    &quot;Grpc-Metadata-Content-Type&quot;: &quot;application/grpc&quot;
+}
+cookies  : {}
+encoding : utf-8
+content_type : application/json
+body     : {
+    &quot;code&quot;: 0,
+    &quot;msg&quot;: &quot;success&quot;,
+    &quot;data&quot;: {
+        &quot;id&quot;: 1,
+        &quot;user&quot;: &quot;admin2021&quot;,
+        &quot;Password&quot;: &quot;$2a$10$7xMSKTdTSKgcVy.dtOHw2uCnYmhz89Y3m0bhYhMgF0DNyDANT1HVe&quot;,
+        &quot;createdAt&quot;: &quot;2021-10-22 09:02:42&quot;,
+        &quot;cookie&quot;: &quot;industry-qa-accessToken=717366675f64949cbc8d8a608714e7e0&quot;
+    }
+}
+[0m
+[32m2021-11-03 16:04:34.126[0m | [1mINFO    [0m | [36mhttprunner.client[0m:[36mrequest[0m:[36m217[0m - [1mstatus_code: 200, response_time(ms): 198.15 ms, response_length: 0 bytes[0m
+[32m2021-11-03 16:04:34.127[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert status_code equal 200(int)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.127[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert headers.&quot;Content-Type&quot; equal application/json(str)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.128[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert body.code equal 0(int)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.129[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert body.msg equal success(str)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.130[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert body.data.id equal 1(int)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.131[0m | [1mINFO    [0m | [36mhttprunner.runner[0m:[36m__run_step[0m:[36m304[0m - [1mrun step end: /v1/user/login &lt;&lt;&lt;&lt;&lt;&lt;
+[0m
+[32m2021-11-03 16:04:34.131[0m | [1mINFO    [0m | [36mhttprunner.runner[0m:[36m__run_step[0m:[36m292[0m - [1mrun step begin: /v1/net/get_net_list &gt;&gt;&gt;&gt;&gt;&gt;[0m
+[32m2021-11-03 16:04:34.181[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mrequest[0m:[36m186[0m - [34m[1mclient IP: 10.158.154.40, Port: 56951[0m
+[32m2021-11-03 16:04:34.182[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mrequest[0m:[36m194[0m - [34m[1mserver IP: 10.4.12.64, Port: 30007[0m
+[32m2021-11-03 16:04:34.183[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mlog_print[0m:[36m40[0m - [34m[1m
+================== request details ==================
+method   : GET
+url      : http://10.4.12.64:30007/v1/net/get_net_list
+headers  : {
+    &quot;User-Agent&quot;: &quot;Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36&quot;,
+    &quot;Accept-Encoding&quot;: &quot;gzip, deflate&quot;,
+    &quot;Accept&quot;: &quot;application/json, text/plain, */*&quot;,
+    &quot;Connection&quot;: &quot;keep-alive&quot;,
+    &quot;Host&quot;: &quot;10.4.12.64:30007&quot;,
+    &quot;Pragma&quot;: &quot;no-cache&quot;,
+    &quot;language&quot;: &quot;en&quot;,
+    &quot;Content-Type&quot;: &quot;application/json;charset=utf-8&quot;,
+    &quot;Cache-Control&quot;: &quot;no-cache&quot;,
+    &quot;token&quot;: &quot;industry-qa-accessToken=705d3309128d1981312286760cb0488b&quot;,
+    &quot;Expires&quot;: &quot;-1&quot;,
+    &quot;Referer&quot;: &quot;http://10.4.12.64:30007/system/networksetup&quot;,
+    &quot;Accept-Language&quot;: &quot;zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7&quot;,
+    &quot;Cookie&quot;: &quot;industry-qa-accessToken=industry-qa-accessToken=705d3309128d1981312286760cb0488b&quot;,
+    &quot;HRUN-Request-ID&quot;: &quot;HRUN-f7273885-745f-4bd8-ac24-ee46611d02e9-674132&quot;
+}
+cookies  : {
+    &quot;industry-qa-accessToken&quot;: &quot;industry-qa-accessToken=705d3309128d1981312286760cb0488b&quot;
+}
+body     : None
+[0m
+[32m2021-11-03 16:04:34.186[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mlog_print[0m:[36m40[0m - [34m[1m
+================== response details ==================
+status_code : 200
+headers  : {
+    &quot;Server&quot;: &quot;nginx/1.17.10&quot;,
+    &quot;Date&quot;: &quot;Wed, 03 Nov 2021 08:02:33 GMT&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;,
+    &quot;Content-Length&quot;: &quot;861&quot;,
+    &quot;Connection&quot;: &quot;keep-alive&quot;,
+    &quot;Grpc-Metadata-Content-Type&quot;: &quot;application/grpc&quot;
+}
+cookies  : {}
+encoding : utf-8
+content_type : application/json
+body     : {
+    &quot;code&quot;: 0,
+    &quot;msg&quot;: &quot;success&quot;,
+    &quot;data&quot;: [
+        {
+            &quot;boot_proto&quot;: &quot;STATIC&quot;,
+            &quot;name&quot;: &quot;LAN1&quot;,
+            &quot;ip_address&quot;: &quot;10.4.12.64&quot;,
+            &quot;netmask&quot;: &quot;255.255.255.0&quot;,
+            &quot;gateway&quot;: &quot;10.4.12.1&quot;,
+            &quot;mac_address&quot;: &quot;48:b0:2d:15:bf:ec&quot;,
+            &quot;default_net&quot;: true
+        },
+        {
+            &quot;boot_proto&quot;: &quot;STATIC&quot;,
+            &quot;name&quot;: &quot;LAN2&quot;,
+            &quot;ip_address&quot;: &quot;192.168.1.89&quot;,
+            &quot;netmask&quot;: &quot;255.255.255.0&quot;,
+            &quot;gateway&quot;: &quot;192.168.19.87&quot;,
+            &quot;mac_address&quot;: &quot;00:07:32:4e:65:81&quot;,
+            &quot;default_net&quot;: false
+        },
+        {
+            &quot;boot_proto&quot;: &quot;DHCP&quot;,
+            &quot;name&quot;: &quot;LAN3&quot;,
+            &quot;ip_address&quot;: &quot;169.254.6.116&quot;,
+            &quot;netmask&quot;: &quot;255.255.0.0&quot;,
+            &quot;gateway&quot;: &quot;0.0.0.0&quot;,
+            &quot;mac_address&quot;: &quot;00:07:32:4e:65:82&quot;,
+            &quot;default_net&quot;: false
+        },
+        {
+            &quot;boot_proto&quot;: &quot;DHCP&quot;,
+            &quot;name&quot;: &quot;LAN4&quot;,
+            &quot;ip_address&quot;: &quot;169.254.6.121&quot;,
+            &quot;netmask&quot;: &quot;255.255.0.0&quot;,
+            &quot;gateway&quot;: &quot;0.0.0.0&quot;,
+            &quot;mac_address&quot;: &quot;00:07:32:4e:65:83&quot;,
+            &quot;default_net&quot;: false
+        },
+        {
+            &quot;boot_proto&quot;: &quot;DHCP&quot;,
+            &quot;name&quot;: &quot;LAN5&quot;,
+            &quot;ip_address&quot;: &quot;169.254.6.126&quot;,
+            &quot;netmask&quot;: &quot;255.255.0.0&quot;,
+            &quot;gateway&quot;: &quot;0.0.0.0&quot;,
+            &quot;mac_address&quot;: &quot;00:07:32:4e:65:84&quot;,
+            &quot;default_net&quot;: false
+        }
+    ]
+}
+[0m
+[32m2021-11-03 16:04:34.186[0m | [1mINFO    [0m | [36mhttprunner.client[0m:[36mrequest[0m:[36m217[0m - [1mstatus_code: 200, response_time(ms): 49.39 ms, response_length: 0 bytes[0m
+[32m2021-11-03 16:04:34.187[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert status_code equal 200(int)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.188[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert headers.&quot;Content-Type&quot; equal application/json(str)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.188[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert body.code equal 0(int)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.189[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert body.msg equal success(str)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.189[0m | [1mINFO    [0m | [36mhttprunner.runner[0m:[36m__run_step[0m:[36m304[0m - [1mrun step end: /v1/net/get_net_list &lt;&lt;&lt;&lt;&lt;&lt;
+[0m
+[32m2021-11-03 16:04:34.189[0m | [1mINFO    [0m | [36mhttprunner.runner[0m:[36m__run_step[0m:[36m292[0m - [1mrun step begin: /v1/dns/get_dns &gt;&gt;&gt;&gt;&gt;&gt;[0m
+[32m2021-11-03 16:04:34.211[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mrequest[0m:[36m186[0m - [34m[1mclient IP: 10.158.154.40, Port: 56951[0m
+[32m2021-11-03 16:04:34.212[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mrequest[0m:[36m194[0m - [34m[1mserver IP: 10.4.12.64, Port: 30007[0m
+[32m2021-11-03 16:04:34.212[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mlog_print[0m:[36m40[0m - [34m[1m
+================== request details ==================
+method   : GET
+url      : http://10.4.12.64:30007/v1/dns/get_dns
+headers  : {
+    &quot;User-Agent&quot;: &quot;Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36&quot;,
+    &quot;Accept-Encoding&quot;: &quot;gzip, deflate&quot;,
+    &quot;Accept&quot;: &quot;application/json, text/plain, */*&quot;,
+    &quot;Connection&quot;: &quot;keep-alive&quot;,
+    &quot;Host&quot;: &quot;10.4.12.64:30007&quot;,
+    &quot;Pragma&quot;: &quot;no-cache&quot;,
+    &quot;language&quot;: &quot;en&quot;,
+    &quot;Content-Type&quot;: &quot;application/json;charset=utf-8&quot;,
+    &quot;Cache-Control&quot;: &quot;no-cache&quot;,
+    &quot;token&quot;: &quot;industry-qa-accessToken=705d3309128d1981312286760cb0488b&quot;,
+    &quot;Expires&quot;: &quot;-1&quot;,
+    &quot;Referer&quot;: &quot;http://10.4.12.64:30007/system/networksetup&quot;,
+    &quot;Accept-Language&quot;: &quot;zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7&quot;,
+    &quot;Cookie&quot;: &quot;industry-qa-accessToken=industry-qa-accessToken=705d3309128d1981312286760cb0488b&quot;,
+    &quot;HRUN-Request-ID&quot;: &quot;HRUN-f7273885-745f-4bd8-ac24-ee46611d02e9-674190&quot;
+}
+cookies  : {
+    &quot;industry-qa-accessToken&quot;: &quot;industry-qa-accessToken=705d3309128d1981312286760cb0488b&quot;
+}
+body     : None
+[0m
+[32m2021-11-03 16:04:34.213[0m | [34m[1mDEBUG   [0m | [36mhttprunner.client[0m:[36mlog_print[0m:[36m40[0m - [34m[1m
+================== response details ==================
+status_code : 200
+headers  : {
+    &quot;Server&quot;: &quot;nginx/1.17.10&quot;,
+    &quot;Date&quot;: &quot;Wed, 03 Nov 2021 08:02:33 GMT&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;,
+    &quot;Content-Length&quot;: &quot;78&quot;,
+    &quot;Connection&quot;: &quot;keep-alive&quot;,
+    &quot;Grpc-Metadata-Content-Type&quot;: &quot;application/grpc&quot;
+}
+cookies  : {}
+encoding : utf-8
+content_type : application/json
+body     : {
+    &quot;code&quot;: 0,
+    &quot;msg&quot;: &quot;success&quot;,
+    &quot;data&quot;: {
+        &quot;primary&quot;: &quot;10.8.8.8&quot;,
+        &quot;secondary&quot;: &quot;8.8.8.8&quot;
+    }
+}
+[0m
+[32m2021-11-03 16:04:34.214[0m | [1mINFO    [0m | [36mhttprunner.client[0m:[36mrequest[0m:[36m217[0m - [1mstatus_code: 200, response_time(ms): 20.92 ms, response_length: 0 bytes[0m
+[32m2021-11-03 16:04:34.214[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert status_code equal 200(int)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.215[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert headers.&quot;Content-Type&quot; equal application/json(str)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.215[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert body.code equal 0(int)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.215[0m | [1mINFO    [0m | [36mhttprunner.response[0m:[36mvalidate[0m:[36m249[0m - [1massert body.msg equal success(str)	==&gt; pass[0m
+[32m2021-11-03 16:04:34.215[0m | [1mINFO    [0m | [36mhttprunner.runner[0m:[36m__run_step[0m:[36m304[0m - [1mrun step end: /v1/dns/get_dns &lt;&lt;&lt;&lt;&lt;&lt;
+[0m
+[32m2021-11-03 16:04:34.218[0m | [1mINFO    [0m | [36mhttprunner.runner[0m:[36mtest_start[0m:[36m460[0m - [1mgenerate testcase log: /Users/yanglei2_vendor/Desktop/20211031/logs/f7273885-745f-4bd8-ac24-ee46611d02e9.run.log[0m
+<br/></div></td></tr></tbody></table></body></html>
