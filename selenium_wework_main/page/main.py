@@ -29,6 +29,7 @@ class Main(BasePage):
         # self._driver.find_element(By.CSS_SELECTOR, '.index_service_cnt_itemWrap:nth-child(1)').click()
 
         self.find(By.ID, 'menu_contacts').click()
-        sleep(2)
+        sleep(5)
         self.find(By.CSS_SELECTOR, '.js_has_member>div:nth-child(1)>a:nth-child(2)').click()
+
         return AddMember(self._driver)

@@ -18,4 +18,4 @@ class TestAddMember(object):
         add_member = self.main.goto_add_member()
         add_member.add_member()
         sleep(3)
-        assert "yanglei110" in add_member.get_member()
+        assert "yanglei112" in add_member.get_member()

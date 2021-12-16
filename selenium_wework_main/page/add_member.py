@@ -19,9 +19,9 @@ class AddMember(BasePage):
 
     def add_member(self):
         sleep(2)
-        self.find(By.ID, 'username').send_keys('yanglei110')
-        self.find(By.ID, 'memberAdd_acctid').send_keys('4')
-        self.find(By.ID, 'memberAdd_phone').send_keys('15518776914')
+        self.find(By.ID, 'username').send_keys('yanglei112')
+        self.find(By.ID, 'memberAdd_acctid').send_keys('5')
+        self.find(By.ID, 'memberAdd_phone').send_keys('15518776915')
         self.find(By.CSS_SELECTOR, '.js_btn_save').click()
         sleep(3)
         return True
