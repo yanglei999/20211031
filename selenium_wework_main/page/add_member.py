@@ -18,22 +18,62 @@ class AddMember(BasePage):
     #     self._driver = driver
 
     def add_member(self):
-        sleep(2)
+        # sleep(2)
         self.find(By.ID, 'username').send_keys('yanglei112')
         self.find(By.ID, 'memberAdd_acctid').send_keys('5')
         self.find(By.ID, 'memberAdd_phone').send_keys('15518776915')
         self.find(By.CSS_SELECTOR, '.js_btn_save').click()
-        sleep(3)
+        # sleep(3)
         return True
 
     def get_member(self):
-        elements = self.finds(By.CSS_SELECTOR, '.member_colRight_memberTable_td:nth-child(2)')
-
-        list = []
-        for element in elements:
-            list.append(element.get_attribute('title'))
+        # self.wait_for_click((By.CSS_SELECTOR, '.ww_checkbox'))
+        # elements = self.finds(By.CSS_SELECTOR, '.member_colRight_memberTable_td:nth-child(2)')
+        # list = []
+        # for element in elements:
+        #     list.append(element.get_attribute('title'))
+        # return list
 
         # list = [element.get_attribute('title') for element in elements]
         # return [element.get_attribute('title') for element in elements]
 
-        return list
+
+        self.wait_for_click((By.CSS_SELECTOR, '.ww_checkbox'))
+        list = []
+        while True:
+            elements = self.finds(By.CSS_SELECTOR, '.member_colRight_memberTable_td:nth-child(2)')
+            for element in elements:
+                list.append(element.get_attribute('title'))
+            content: str = self.find(By.CSS_SELECTOR, '.ww_pageNav_info_text').text
+            cur_page, total_page = [int(i) for i in content.split('/', 1)]
+            cur_page = [int(i) for i in content.split('/', 1)][0]
+            if cur_page == total_page:
+                return list
+            else:
+                self.find(By.CSS_SELECTOR, '.js_next_page').click()
+
+    def update_page(self):
+        content: str = self.find(By.CSS_SELECTOR, '.ww_pageNav_info_text').text
+        return [int(i) for i in content.split('/', 1)]
+
+    def get_member_youhua(self, value):
+
+        self.wait_for_click((By.CSS_SELECTOR, '.ww_checkbox'))
+        cur_page, total_page = self.update_page()
+        while True:
+            elements = self.finds(By.CSS_SELECTOR, '.member_colRight_memberTable_td:nth-child(2)')
+            for element in elements:
+                if value == element.get_attribute('title'):
+                    return True
+            cur_page = self.update_page()[0]
+            if cur_page == total_page:
+                return False
+            else:
+                self.find(By.CSS_SELECTOR, '.js_next_page').click()
+
+
+
+
+
+
+
